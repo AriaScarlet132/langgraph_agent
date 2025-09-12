@@ -101,7 +101,7 @@ class AgentService:
                     # AI消息流式内容
                     if isinstance(token, AIMessageChunk) and token.content and token.content != '':
                         yield {
-                            "type": "ai_message",
+                            "type": "agent_message",
                             "content": token.content
                         }
                         
