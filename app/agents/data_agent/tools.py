@@ -27,11 +27,6 @@ def query_data(
         table (str): The name of the table to query.
     """
 
-    print(state)
-
-    # print("host", state['host'])
-    # print("username", state['username'])
-
     from app.utils.data import get_token, query_data
     token = get_token(state['host'])
     data = query_data(state['host'], token, state['username'], sql, table)
