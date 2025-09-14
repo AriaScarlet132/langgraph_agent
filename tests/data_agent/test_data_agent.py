@@ -21,18 +21,26 @@ def stream_agent_response(query, config=None):
 		# 	print("\n", flush=True)
 
 if __name__ == "__main__":
+
+	# from app.utils.data import get_table_definition
+
+	# print(get_table_definition(
+	# 	host="http://lkf-datav.lbiya.cn:7080",
+	# 	userid="Admin"
+	# ))
+
 	config = {
 		"configurable": {
-			"thread_id": "test_thread_11",
+			"thread_id": "test_thread_12",
 		}
 	}
 
 	# 构造 state - 使用正确的消息格式
 	state = {
-		"messages": [HumanMessage(content="我刚刚说了什么？")],
+		"messages": [HumanMessage(content="查下系统里有几个工单")],
 		"username": "Admin",
 		"table_description": "ServiceOrderInfoQueryDS_Datav 工单情况",
-		"host": "http://192.168.10.21:3000",
+		"host": "http://lkf-datav.lbiya.cn:7080",
 		"context": {}
 	}
 

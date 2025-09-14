@@ -1,7 +1,7 @@
 from flask import Flask, request, Response, jsonify
 import json
 from typing import Optional, Dict, Any
-from app.api.agent_service import agent_service
+from app.services.agent_service import agent_service
 
 
 app = Flask(__name__)
@@ -27,7 +27,7 @@ def chat():
         "thread_id": "可选的线程ID", 
         "state": {
             "username": "可选的用户名",
-            "host": "可选的主机地址",
+            "host": "可选的主机地址(http://lkf-datav.lbiya.cn:7080)",
             "table_description": "可选的表描述",
             "其他状态参数": "值"
         }
@@ -46,15 +46,22 @@ def chat():
         thread_id = data.get('thread_id')
         extra_state = data.get('state', {})
         
+        # 获取表结构
+        from app.utils.data import get_table_definition
+        table_definition = get_table_definition(
+            host=extra_state.get('host', 'http://lkf-datav.lbiya.cn:7080'),
+            userid=extra_state.get('username', 'Admin'),
+        )
+        extra_state['table_description'] = table_definition
+
         # 检查是否请求流式响应
         stream = data.get('stream', True)
         
         if stream:
-            # 返回流式响应
+            # 返回流式响应（直接转发 service 层产生的消息）
             def generate():
                 for response in agent_service.stream_agent_response(query, thread_id, extra_state):
                     yield f"data: {json.dumps(response, ensure_ascii=False)}\n\n"
-                yield "data: [DONE]\n\n"
             
             return Response(
                 generate(),
@@ -96,14 +103,19 @@ def chat_stream():
         
         thread_id = data.get('thread_id')
         extra_state = data.get('state', {})
+
+        # 获取表结构
+        from app.utils.data import get_table_definition
+        table_definition = get_table_definition(
+            host=extra_state.get('host', 'http://lkf-datav.lbiya.cn:7080'),
+            userid=extra_state.get('username', 'Admin'),
+        )
+        extra_state['table_description'] = table_definition
         
         def generate():
-            yield "data: " + json.dumps({"type": "start", "content": "开始处理请求"}, ensure_ascii=False) + "\n\n"
-            
+            # 直接转发 service 层产生的消息（service 会负责发送 message_start/message_end）
             for response in agent_service.stream_agent_response(query, thread_id, extra_state):
                 yield f"data: {json.dumps(response, ensure_ascii=False)}\n\n"
-            
-            yield "data: " + json.dumps({"type": "end", "content": "处理完成"}, ensure_ascii=False) + "\n\n"
         
         return Response(
             generate(),

@@ -26,12 +26,12 @@ def test_chat_non_stream():
     print("=== 非流式聊天测试 ===")
     
     payload = {
-        "query": "你能查一下系统里有几条工单吗？",
+        "query": "你都能看到哪些表呢？",
         "stream": False,
         "state": {
-            "username": "TestUser",
-            "host": "http://192.168.10.21:3000",
-            "table_description": "ServiceOrderInfoQueryDS_Datav 工单情况"
+            "username": "Admin",
+            "host": "http://lkf-datav.lbiya.cn:7080",
+            "datasets": "ServiceOrderInfoQueryDS_Datav, ChargeItemDetailDS_Datav"
         }
     }
     
@@ -51,10 +51,11 @@ def test_chat_stream():
     print("=== 流式聊天测试 ===")
     
     payload = {
-        "query": "你好，请介绍一下你的功能",
-        "thread_id": "test_thread_001",
+        "query": "分析一下2025年的工单情况",
+        "thread_id": "test_thread_235",
         "state": {
-            "username": "StreamTestUser"
+            "username": "Admin",
+            "host": "http://lkf-datav.lbiya.cn:7080",
         }
     }
     
@@ -75,12 +76,30 @@ def test_chat_stream():
                 data = decoded_line[6:]  # 移除 'data: ' 前缀
                 try:
                     parsed_data = json.loads(data)
-                    print(f"[{parsed_data['type']}] {parsed_data.get('content', '')}")
+                    response_type = parsed_data.get('type')
+                    content = parsed_data.get('content', '')
                     
-                    # 如果是工具调用，显示详细信息
-                    if parsed_data['type'] == 'tool_call':
-                        print(f"  工具: {parsed_data.get('tool_name')}")
-                        print(f"  参数: {parsed_data.get('arguments')}")
+                    if response_type == 'agent_message':
+                        # 普通的AI响应消息，直接打印内容
+                        print(content, end='', flush=True)
+                    elif response_type == 'tool_call':
+                        # 工具调用信息
+                        print(f"\n[调用工具] {parsed_data.get('tool_name')}，参数: {parsed_data.get('arguments')}\n", flush=True)
+                    elif response_type == 'tool_message':
+                        # 工具返回的消息
+                        print(f"[工具消息] {content}\n", flush=True)
+                    elif response_type == 'message_start':
+                        # 消息开始标记
+                        print(f"[对话开始] 线程ID: {parsed_data.get('thread_id')}", flush=True)
+                    elif response_type == 'message_end':
+                        # 消息结束标记
+                        print(f"\n[对话结束]", flush=True)
+                    elif response_type == 'error':
+                        # 错误消息
+                        print(f"\n[错误] {content}", flush=True)
+                    else:
+                        # 其他类型的响应
+                        print(f"[{response_type}] {content}")
                         
                 except json.JSONDecodeError:
                     print(f"无法解析: {data}")
@@ -171,10 +190,10 @@ if __name__ == "__main__":
         time.sleep(1)
         
         # 测试非流式
-        test_non_stream = input("测试非流式API？(y/n): ").lower() == 'y'
-        if test_non_stream:
-            test_chat_non_stream()
-            time.sleep(1)
+        # test_non_stream = input("测试非流式API？(y/n): ").lower() == 'y'
+        # if test_non_stream:
+        #     test_chat_non_stream()
+        #     time.sleep(1)
         
         # 测试流式
         test_stream = input("测试流式API？(y/n): ").lower() == 'y'
@@ -182,16 +201,16 @@ if __name__ == "__main__":
             test_chat_stream()
             time.sleep(1)
             
-        # 测试简单流式
-        test_simple = input("测试简单流式？(y/n): ").lower() == 'y'
-        if test_simple:
-            test_simple_stream()
-            time.sleep(1)
+        # # 测试简单流式
+        # test_simple = input("测试简单流式？(y/n): ").lower() == 'y'
+        # if test_simple:
+        #     test_simple_stream()
+        #     time.sleep(1)
             
         # 测试自定义状态
-        test_custom = input("测试自定义状态？(y/n): ").lower() == 'y'
-        if test_custom:
-            test_with_custom_state()
+        # test_custom = input("测试自定义状态？(y/n): ").lower() == 'y'
+        # if test_custom:
+        #     test_with_custom_state()
             
     except KeyboardInterrupt:
         print("\n测试被用户中断")

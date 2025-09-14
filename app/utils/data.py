@@ -17,18 +17,19 @@ def get_token(host: str) -> str:
     else:
         raise Exception(f"Failed to get token: {response.status_code}, {response.text}")
 
-def get_table_definition(host: str, token: str, userid: str, datasets: str) -> str:
+def get_table_definition(host: str, userid: str) -> str:
+    token = get_token(host)
     headers = {
         "Authorization": f"Bearer {token}"
     }
     response = requests.post(
-        url=f"{host}/api/oauthaccess/datav/agent/queryDDLByDataset",
+        url=f"{host}/api/oauthaccess/datav/agent/queryDDL",
         headers=headers,
         json={
             "userid": userid,
-            "dataset": datasets
         }
     )
+    print(f"获取表结构响应: {response.status_code}, {response.text}")
     if response.status_code == 200:
         return response.json().get("data", "")
     else:

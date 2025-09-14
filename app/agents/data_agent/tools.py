@@ -1,8 +1,10 @@
 from typing import Annotated
 from langgraph.prebuilt import InjectedState
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import tool
 from app.agents.data_agent.state import State
 
+@tool("get_weather", parse_docstring=True)
 def get_weather(city: str) -> str:
     """
     Get weather for a given city.
@@ -12,6 +14,7 @@ def get_weather(city: str) -> str:
     """
     return f"The weather in {city} is sunny with a high of 25°C and a low of 15°C."
 
+@tool("query_data", parse_docstring=True)
 def query_data(
         # access information that's dynamically updated inside the agent
         state: Annotated[State, InjectedState],
@@ -27,7 +30,7 @@ def query_data(
         table (str): The name of the table to query.
     """
 
-    from app.utils.data import get_token, query_data
+    from app.utils.data import get_token, query_data as query_data_func
     token = get_token(state['host'])
-    data = query_data(state['host'], token, state['username'], sql, table)
+    data = query_data_func(state['host'], token, state['username'], sql, table)
     return str(data)

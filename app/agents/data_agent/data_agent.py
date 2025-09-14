@@ -6,7 +6,7 @@ from langmem.short_term import SummarizationNode
 from langchain_core.messages.utils import count_tokens_approximately
 from app.agents.data_agent.state import State
 
-from app.agents.data_agent.model import model
+from app.agents.data_agent.model import model, deepseek
 from app.agents.data_agent.tools import get_weather, query_data
 
 basic_prompt = """
@@ -43,11 +43,13 @@ basic_prompt = """
 """
 
 conn = pymysql.connect(
-    host='192.168.10.24',
+    # host='192.168.10.24',
+    host='b3f48ce4.natappfree.cc',
     user='root',
     password='123456',
     database='langgraph',
-    port=3306,
+    # port=3306,
+    port=24982,
 )
 
 def prompt(state: State) -> str:
@@ -59,7 +61,7 @@ checkPointer = PyMySQLSaver(conn)
 checkPointer.setup()
 
 sumarization_node = SummarizationNode(
-    model=model,
+    model=deepseek,
     token_counter=count_tokens_approximately,
     max_tokens=30000,  # 设为 ~30k，留给最终响应的空间（假设 32k 上下文）
     max_tokens_before_summary=8000,  # 推荐设为 8k，平衡触发频率和上下文利用
@@ -67,7 +69,7 @@ sumarization_node = SummarizationNode(
 )
 
 agent = create_react_agent(
-    model = model,
+    model = deepseek,
     tools=[get_weather, query_data],
     prompt=prompt,
     checkpointer=checkPointer,
