@@ -9,7 +9,7 @@ import time
 
 
 # API 基础URL
-BASE_URL = "http://localhost:5000"
+BASE_URL = "http://localhost:4396"
 
 
 def test_health_check():
@@ -26,11 +26,11 @@ def test_chat_non_stream():
     print("=== 非流式聊天测试 ===")
     
     payload = {
-        "query": "你都能看到哪些表呢？",
+        "query": "你是谁？",
         "stream": False,
         "state": {
             "username": "Admin",
-            "host": "http://lkf-datav.lbiya.cn:7080",
+            "host": "http://192.168.10.21:3000",
             "datasets": "ServiceOrderInfoQueryDS_Datav, ChargeItemDetailDS_Datav"
         }
     }
@@ -51,11 +51,11 @@ def test_chat_stream():
     print("=== 流式聊天测试 ===")
     
     payload = {
-        "query": "分析一下2025年的工单情况",
-        "thread_id": "test_thread_235",
+        "query": "那你查一下2025年工单数量",
+        "thread_id": "test_thread_001",
         "state": {
             "username": "Admin",
-            "host": "http://lkf-datav.lbiya.cn:7080",
+            "host": "http://192.168.10.21:3000",
         }
     }
     

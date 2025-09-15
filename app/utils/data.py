@@ -29,7 +29,7 @@ def get_table_definition(host: str, userid: str) -> str:
             "userid": userid,
         }
     )
-    print(f"获取表结构响应: {response.status_code}, {response.text}")
+    # print(f"获取表结构响应: {response.status_code}, {response.text}")
     if response.status_code == 200:
         return response.json().get("data", "")
     else:

@@ -42,14 +42,29 @@ basic_prompt = """
 {messages}
 """
 
+basic_prompt = """
+you're a helpful assistant
+
+# 参数提供
+
+- 用户ID: 
+{username}
+
+- 数据库表描述:
+{table_description}
+
+- 用户最新提问:
+{messages}
+"""
+
 conn = pymysql.connect(
-    # host='192.168.10.24',
-    host='b3f48ce4.natappfree.cc',
+    host='localhost',
+    # host='b3f48ce4.natappfree.cc',
     user='root',
-    password='123456',
+    password='aa1234579',
     database='langgraph',
-    # port=3306,
-    port=24982,
+    port=3306,
+    # port=24982,
 )
 
 def prompt(state: State) -> str:
@@ -60,7 +75,7 @@ def prompt(state: State) -> str:
 checkPointer = PyMySQLSaver(conn)
 checkPointer.setup()
 
-sumarization_node = SummarizationNode(
+summarization_node = SummarizationNode(
     model=deepseek,
     token_counter=count_tokens_approximately,
     max_tokens=30000,  # 设为 ~30k，留给最终响应的空间（假设 32k 上下文）
@@ -73,6 +88,6 @@ agent = create_react_agent(
     tools=[get_weather, query_data],
     prompt=prompt,
     checkpointer=checkPointer,
-    pre_model_hook=sumarization_node,
+    pre_model_hook=summarization_node,
     state_schema=State,
 )

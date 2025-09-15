@@ -84,7 +84,7 @@ class AgentService:
             try:
                 for token, metadata in self.agent.stream(state, stream_mode="messages", config=config):
                     if metadata['langgraph_node'] == 'agent':
-                        
+                        print(f"[AgentService] Agent token: \n{token}, \nmetadata: \n{metadata}")
                         # 工具调用消息
                         if isinstance(token, ToolMessage):
                             yield {
