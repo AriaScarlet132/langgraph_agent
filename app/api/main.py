@@ -52,7 +52,7 @@ def chat():
             host=extra_state.get('host', 'http://lkf-datav.lbiya.cn:7080'),
             userid=extra_state.get('username', 'Admin'),
         )
-        extra_state['table_description'] = table_definition
+        extra_state['table_description'] = str(table_definition)
 
         # 检查是否请求流式响应
         stream = data.get('stream', True)
@@ -110,7 +110,7 @@ def chat_stream():
             host=extra_state.get('host', 'http://lkf-datav.lbiya.cn:7080'),
             userid=extra_state.get('username', 'Admin'),
         )
-        extra_state['table_description'] = table_definition
+        extra_state['table_description'] = str(table_definition)
         
         def generate():
             # 直接转发 service 层产生的消息（service 会负责发送 message_start/message_end）

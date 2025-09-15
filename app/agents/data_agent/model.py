@@ -1,5 +1,6 @@
 from langchain_ollama import ChatOllama
 from langchain_deepseek import ChatDeepSeek
+from langchain_openai import ChatOpenAI
 
 model = ChatOllama(
     base_url="http://localhost:11434",
@@ -19,4 +20,12 @@ deepseek = ChatDeepSeek(
     base_url="https://api.deepseek.com",
     api_key=DEEP_SEEK_API_KEY,
     model="deepseek-chat"
+)
+
+QWEN_API_KEY = "sk-8e8db79b2a674c13865028a046988791"
+
+qwen = ChatOpenAI(
+    model="qwen3-max-preview",
+    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    api_key=QWEN_API_KEY,
 )

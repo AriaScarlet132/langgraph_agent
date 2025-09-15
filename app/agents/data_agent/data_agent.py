@@ -6,7 +6,7 @@ from langmem.short_term import SummarizationNode
 from langchain_core.messages.utils import count_tokens_approximately
 from app.agents.data_agent.state import State
 
-from app.agents.data_agent.model import model, deepseek
+from app.agents.data_agent.model import model, deepseek, qwen
 from app.agents.data_agent.tools import get_weather, query_data
 
 basic_prompt = """
@@ -37,40 +37,21 @@ basic_prompt = """
 
 - 数据库表描述:
 {table_description}
-
-- 用户最新提问:
-{messages}
-"""
-
-basic_prompt = """
-you're a helpful assistant
-
-# 参数提供
-
-- 用户ID: 
-{username}
-
-- 数据库表描述:
-{table_description}
-
-- 用户最新提问:
-{messages}
 """
 
 conn = pymysql.connect(
     host='localhost',
-    # host='b3f48ce4.natappfree.cc',
     user='root',
-    password='aa1234579',
+    password='123456',
     database='langgraph',
     port=3306,
-    # port=24982,
 )
 
 def prompt(state: State) -> str:
     username = state['username']
     table_description = state['table_description']
-    return basic_prompt.format(username=username, table_description=table_description, messages=state['messages'])
+    system_msg = basic_prompt.format(username=username, table_description=table_description)
+    return [{"role": "system", "content": system_msg}] + state['messages']
 
 checkPointer = PyMySQLSaver(conn)
 checkPointer.setup()
@@ -84,7 +65,7 @@ summarization_node = SummarizationNode(
 )
 
 agent = create_react_agent(
-    model = deepseek,
+    model = qwen,
     tools=[get_weather, query_data],
     prompt=prompt,
     checkpointer=checkPointer,

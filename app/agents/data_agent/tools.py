@@ -6,7 +6,10 @@ from app.agents.data_agent.state import State
 import logging
 
 @tool
-def get_weather(city: str) -> str:
+def get_weather(
+    # access information that's dynamically updated inside the agent
+        state: Annotated[State, InjectedState],
+        city: str) -> str:
     """
     Get weather for a given city.
 
@@ -14,6 +17,7 @@ def get_weather(city: str) -> str:
         city (str): The name of the city.
     """
     print(f"[get_weather] Called with city: {city}")
+    # print(f"[get_weather] State: {state}")
     # 如果有全局 state，可以在这里输出
     return f"The weather in {city} is sunny with a high of 25°C and a low of 15°C."
 
@@ -33,7 +37,7 @@ def query_data(
 
 
     print(f"[query_data] Called with sql: {sql}, table: {table}")
-    print(f"[query_data] State: {state}")
+    # print(f"[query_data] State: {state}")
 
     from app.utils.data import get_token, query_data as query_data_func
     # token = get_token(state['host'])
