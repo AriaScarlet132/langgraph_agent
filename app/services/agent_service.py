@@ -68,31 +68,33 @@ class AgentService:
             thread_id: 线程ID，如果为None则自动生成
             extra_state: 额外的状态参数
             
-        Yields:
-            dict: 包含响应类型和内容的字典
+        Returns:
+            generator: yields response event dictionaries
         """
+        generator_closing = False
+        current_message_id: Optional[str] = None
         try:
             state, config = self.prepare_state(query, thread_id, extra_state)
-            
+
             # 返回开始/结束标记（开始）
             thread_id = config["configurable"]["thread_id"]
             # 发送一条空的 message_start，用于客户端标记对话开始
+            # 为本次回复生成一个共享的 message_id，所有片段和工具事件将使用同一个 id
+            current_message_id = str(uuid.uuid4())
             yield {
                 "type": "message_start",
                 "content": "",
-                "thread_id": thread_id
+                "thread_id": thread_id,
+                "message_id": current_message_id
             }
-            
-            # 流式处理代理响应 - 完全按照test_data_agent.py的逻辑
-            try:
-                # 用于在流式过程中暂存工具调用的参数片段
-                # 结构: { index: { 'name': str|None, 'id': str|None, 'args_str': str } }
-                tool_call_buffers: Dict[int, Dict[str, Any]] = {}
-                # 跟踪已发出的工具调用（按 tool_call_id 关联以便结合工具返回）
-                # 结构: { tool_call_id: { 'tool_name': str, 'arguments': Any } }
-                pending_tool_calls: Dict[str, Dict[str, Any]] = {}
 
-                for token, metadata in self.agent.stream(state, stream_mode="messages", config=config):
+            # 流式处理代理响应 - 完全按照test_data_agent.py的逻辑
+            tool_call_buffers: Dict[int, Dict[str, Any]] = {}
+            pending_tool_calls: Dict[str, Dict[str, Any]] = {}
+
+            stream_iter = self.agent.stream(state, stream_mode="messages", config=config)
+            try:
+                for token, metadata in stream_iter:
                     # 工具调用消息：不限制节点，直接转发工具执行结果
                     if isinstance(token, ToolMessage):
                         payload: Dict[str, Any] = {
@@ -107,6 +109,10 @@ class AgentService:
                             payload["tool_call_id"] = tool_call_id
                         if tool_name:
                             payload["tool_name"] = tool_name
+                        payload["message_id"] = current_message_id or str(uuid.uuid4())
+                        # 如果没有 current_message_id（极端情况），回退为新的 uuid
+                        if not current_message_id:
+                            current_message_id = payload["message_id"]
                         yield payload
 
                         # 如果之前记录了对应的工具调用参数，则组合一个完整的结果事件
@@ -118,12 +124,12 @@ class AgentService:
                                 "arguments": prev.get("arguments"),
                                 "result": token.content,
                                 "tool_call_id": tool_call_id,
-                                "thread_id": thread_id
+                                "thread_id": thread_id,
+                                "message_id": prev.get("message_id") or current_message_id or str(uuid.uuid4())
                             }
 
                     # 处理 AIMessage（非分片），用于在 finish_reason=tool_calls 时输出完整工具调用
                     if isinstance(token, AIMessage) and metadata.get('langgraph_node') == 'agent':
-                        # OpenAI/DeepSeek 等模型会在完成工具调用构造后给出 finish_reason=tool_calls
                         finish_reason = None
                         try:
                             finish_reason = (getattr(token, "response_metadata", None) or {}).get("finish_reason")
@@ -131,13 +137,11 @@ class AgentService:
                             finish_reason = None
 
                         if finish_reason == "tool_calls":
-                            # 将已累计的分片组装为完整的工具调用
                             for idx, buf in sorted(tool_call_buffers.items(), key=lambda x: x[0]):
                                 name = buf.get("name")
                                 args_str = buf.get("args_str", "")
                                 tool_call_id = buf.get("id")
 
-                                # 如果 name 还缺失，尝试从 token.tool_calls 补齐
                                 try:
                                     if not name and getattr(token, "tool_calls", None):
                                         calls = token.tool_calls  # type: ignore
@@ -146,7 +150,6 @@ class AgentService:
                                 except Exception:
                                     pass
 
-                                # 尝试解析 JSON 参数
                                 parsed_args: Any = args_str
                                 if isinstance(args_str, str):
                                     s = args_str.strip()
@@ -154,7 +157,6 @@ class AgentService:
                                         try:
                                             parsed_args = json.loads(s)
                                         except Exception:
-                                            # 解析失败则原样返回字符串，避免丢失信息
                                             parsed_args = s
 
                                 event: Dict[str, Any] = {
@@ -165,27 +167,26 @@ class AgentService:
                                 }
                                 if tool_call_id:
                                     event["tool_call_id"] = tool_call_id
+                                event["message_id"] = current_message_id or str(uuid.uuid4())
+                                if not current_message_id:
+                                    current_message_id = event["message_id"]
                                 yield event
 
-                                # 记录待匹配的工具调用，便于结合后续 ToolMessage 输出完整结果
                                 if tool_call_id:
                                     pending_tool_calls[tool_call_id] = {
                                         "tool_name": name or "",
                                         "arguments": parsed_args,
                                     }
 
-                            # 清空缓冲，准备下一轮
                             tool_call_buffers.clear()
                             continue
 
-                        # 非流式（一次性提供完整 tool_calls）的兜底处理
                         if getattr(token, "tool_calls", None) and not tool_call_buffers:
                             try:
                                 for call in token.tool_calls:  # type: ignore
                                     name = call.get("name", "")
                                     args_val = call.get("args")
                                     tool_call_id = call.get("id")
-                                    # 如果是字符串，尽量解析 JSON
                                     if isinstance(args_val, str):
                                         try:
                                             args_val = json.loads(args_val)
@@ -203,19 +204,22 @@ class AgentService:
                                             "tool_name": name,
                                             "arguments": args_val,
                                         }
-                                    yield event
+                                    event["message_id"] = current_message_id or str(uuid.uuid4())
+                                    if not current_message_id:
+                                        current_message_id = event["message_id"]
+                                    # yield event # 此为预置节点 也就是大模型开始调用工具但是未拼装好参数时的消息
                             except Exception:
-                                # 保底：不让异常打断主流程
                                 pass
 
                     # 处理 AIMessageChunk（分片），累积工具调用参数与输出文本内容
                     if isinstance(token, AIMessageChunk):
                         # 文本内容分片（仅 agent 节点）
-                        if metadata.get('langgraph_node') == 'agent' and token.content:
+                        if metadata.get('langgraph_node') == 'agent' and getattr(token, 'content', None):
                             yield {
                                 "type": "agent_message",
                                 "content": token.content,
-                                "thread_id": thread_id
+                                "thread_id": thread_id,
+                                "message_id": current_message_id or str(uuid.uuid4())
                             }
 
                         # 工具调用分片（逐步拼接 JSON）
@@ -234,33 +238,59 @@ class AgentService:
                                     buf["name"] = name_piece
                                 if isinstance(args_piece, str):
                                     buf["args_str"] += args_piece
-                                # 如果提供了 id 则记录
                                 if id_piece and not buf["id"]:
                                     buf["id"] = id_piece
+                                # 将本次片段所属的 message_id 也记录到缓冲，便于后续组合
+                                if current_message_id:
+                                    buf.setdefault("message_id", current_message_id)
                         except Exception:
-                            # 忽略分片解析异常，避免中断主流程
                             pass
+            except GeneratorExit:
+                # 标记为正在关闭，避免在外层 finally 中再 yield
+                generator_closing = True
+                try:
+                    if hasattr(stream_iter, 'close'):
+                        stream_iter.close()
+                except Exception:
+                    pass
+                # 返回以正常结束生成器（不要重新抛出 GeneratorExit）
+                return
             except Exception as stream_error:
                 yield {
-                    "type": "error", 
+                    "type": "error",
                     "content": f"流式处理中断: {str(stream_error)}",
-                    "thread_id": thread_id
+                    "thread_id": thread_id,
+                    "message_id": current_message_id or str(uuid.uuid4())
                 }
-                        
+            finally:
+                try:
+                    if hasattr(stream_iter, 'close'):
+                        stream_iter.close()
+                except Exception:
+                    pass
+
+        except GeneratorExit:
+            # 外部关闭生成器（例如客户端断开），优雅结束
+            generator_closing = True
+            return
         except Exception as e:
             yield {
                 "type": "error",
                 "content": f"处理请求时发生错误: {str(e)}",
-                "thread_id": thread_id if 'thread_id' in locals() else None
+                "thread_id": thread_id if 'thread_id' in locals() else None,
+                "message_id": current_message_id or str(uuid.uuid4())
             }
         finally:
             # 流处理完成，发送一条空的 message_end，用于客户端标记对话结束
             try:
-                yield {
-                    "type": "message_end",
-                    "content": "",
-                    "thread_id": thread_id
-                }
+                # 只有在生成器没有被外部关闭的情况下发送结束事件
+                if not generator_closing:
+                    yield {
+                        "type": "message_end",
+                        "content": "",
+                        "thread_id": thread_id,
+                        "message_id": current_message_id or str(uuid.uuid4())
+                    }
             except Exception:
                 # 在极端错误情况下，忽略结束消息发送错误
                 pass

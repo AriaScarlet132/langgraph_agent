@@ -5,6 +5,7 @@ from langgraph.checkpoint.mysql.pymysql import PyMySQLSaver
 from langmem.short_term import SummarizationNode
 from langchain_core.messages.utils import count_tokens_approximately
 from app.agents.data_agent.state import State
+from langchain_core.messages import SystemMessage
 
 from app.agents.data_agent.model import model, deepseek, qwen
 from app.agents.data_agent.tools import get_weather, query_data
@@ -47,11 +48,20 @@ conn = pymysql.connect(
     port=3306,
 )
 
-def prompt(state: State) -> str:
-    username = state['username']
-    table_description = state['table_description']
+def prompt(state: State):
+    # state may be a dict-like mapping or an object depending on caller
+    try:
+        username = state['username']
+    except Exception:
+        username = getattr(state, 'username', 'Admin')
+    try:
+        table_description = state['table_description']
+    except Exception:
+        table_description = getattr(state, 'table_description', '')
+
     system_msg = basic_prompt.format(username=username, table_description=table_description)
-    return [{"role": "system", "content": system_msg}] + state['messages']
+    # Return LangChain message objects (SystemMessage) so downstream agents recognize them
+    return [SystemMessage(content=system_msg)] + state['messages']
 
 checkPointer = PyMySQLSaver(conn)
 checkPointer.setup()
@@ -70,5 +80,5 @@ agent = create_react_agent(
     prompt=prompt,
     checkpointer=checkPointer,
     pre_model_hook=summarization_node,
-    state_schema=State,
-)
+    state_schema=State
+).with_config(recursion_limit=30)

@@ -51,8 +51,8 @@ def test_chat_stream():
     print("=== 流式聊天测试 ===")
     
     payload = {
-        "query": "那你查一下2025年工单数量",
-        "thread_id": "test_thread_001",
+        "query": "我刚刚说了什么?",
+        "thread_id": "test_thread_008",
         "state": {
             "username": "Admin",
             "host": "http://192.168.10.21:3000",

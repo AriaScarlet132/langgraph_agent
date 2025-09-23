@@ -40,6 +40,6 @@ def query_data(
     # print(f"[query_data] State: {state}")
 
     from app.utils.data import get_token, query_data as query_data_func
-    # token = get_token(state['host'])
-    # data = query_data_func(state['host'], token, state['username'], sql, table)
-    return "12334"
+    token = get_token(state['host'])
+    data = query_data_func(state['host'], token, state['username'], sql, table)
+    return data

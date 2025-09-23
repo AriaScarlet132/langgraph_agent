@@ -1,10 +1,27 @@
 from flask import Flask, request, Response, jsonify
+try:
+    from flask_cors import CORS
+except Exception:
+    CORS = None
 import json
 from typing import Optional, Dict, Any
 from app.services.agent_service import agent_service
 
 
 app = Flask(__name__)
+# 尝试使用 flask_cors，如果不可用则在 after_request 中回退设置 CORS 头
+if CORS:
+    CORS(app, resources={r"/*": {"origins": "*"}})
+
+
+@app.after_request
+def add_cors_headers(response: Response):
+    # 如果 flask_cors 已经设置了头，这里不会覆盖；否则补充常见的 CORS 头
+    if not response.headers.get('Access-Control-Allow-Origin'):
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    return response
 
 
 @app.route('/')
@@ -56,20 +73,22 @@ def chat():
 
         # 检查是否请求流式响应
         stream = data.get('stream', True)
-        
+
         if stream:
             # 返回流式响应（直接转发 service 层产生的消息）
             def generate():
                 for response in agent_service.stream_agent_response(query, thread_id, extra_state):
                     yield f"data: {json.dumps(response, ensure_ascii=False)}\n\n"
-            
+
             return Response(
                 generate(),
                 mimetype='text/plain',
                 headers={
                     'Cache-Control': 'no-cache',
                     'Connection': 'keep-alive',
-                    'X-Accel-Buffering': 'no'
+                    'X-Accel-Buffering': 'no',
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Headers': 'Content-Type'
                 }
             )
         else:
@@ -77,12 +96,16 @@ def chat():
             responses = []
             for response in agent_service.stream_agent_response(query, thread_id, extra_state):
                 responses.append(response)
-            
-            return jsonify({
+
+            resp = jsonify({
                 "success": True,
                 "responses": responses
             })
-            
+            # 确保非流式响应也带上 CORS 头（在没有 flask_cors 时）
+            resp.headers['Access-Control-Allow-Origin'] = '*'
+            resp.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+            return resp
+
     except Exception as e:
         return jsonify({"error": f"处理请求时发生错误: {str(e)}"}), 500
 
@@ -125,6 +148,7 @@ def chat_stream():
                 'Connection': 'keep-alive',
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
                 'X-Accel-Buffering': 'no'
             }
         )

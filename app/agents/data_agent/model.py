@@ -25,7 +25,7 @@ deepseek = ChatDeepSeek(
 QWEN_API_KEY = "sk-8e8db79b2a674c13865028a046988791"
 
 qwen = ChatOpenAI(
-    model="qwen3-max-preview",
+    model="qwen3-235b-a22b-instruct-2507",
     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     api_key=QWEN_API_KEY,
 )
